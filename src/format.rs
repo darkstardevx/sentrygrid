@@ -32,10 +32,22 @@ pub fn render_report(findings: &[Finding], color_on: bool, show_safe: bool) -> S
             continue;
         }
 
-        let (c, r) = if color_on { (color(f.severity), reset().to_string()) } else { (String::new(), String::new()) };
+        let (c, r) = if color_on {
+            (color(f.severity), reset().to_string())
+        } else {
+            (String::new(), String::new())
+        };
         let process = f.socket.process.as_deref().unwrap_or("?");
-        let container_note = f.docker_container.as_ref().map(|c| format!(" (container: {c})")).unwrap_or_default();
-        let scope_suffix = f.scope_note.as_ref().map(|n| format!(" [{n}]")).unwrap_or_default();
+        let container_note = f
+            .docker_container
+            .as_ref()
+            .map(|c| format!(" (container: {c})"))
+            .unwrap_or_default();
+        let scope_suffix = f
+            .scope_note
+            .as_ref()
+            .map(|n| format!(" [{n}]"))
+            .unwrap_or_default();
         let addr_note = match &f.socket.addr {
             crate::ss::BindAddr::Wildcard => "0.0.0.0/[::]".to_string(),
             crate::ss::BindAddr::Loopback => "127.0.0.1".to_string(),

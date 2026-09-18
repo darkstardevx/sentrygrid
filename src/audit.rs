@@ -52,7 +52,11 @@ pub struct Finding {
     pub scope_note: Option<String>,
 }
 
-pub fn correlate(sockets: Vec<Socket>, ufw: &UfwState, docker_ports: &[DockerPort]) -> Vec<Finding> {
+pub fn correlate(
+    sockets: Vec<Socket>,
+    ufw: &UfwState,
+    docker_ports: &[DockerPort],
+) -> Vec<Finding> {
     sockets
         .into_iter()
         .map(|socket| {
@@ -107,7 +111,13 @@ mod tests {
     use crate::ss::BindAddr;
 
     fn socket(proto: &'static str, addr: BindAddr, port: u16, process: Option<&str>) -> Socket {
-        Socket { proto, addr, port, process: process.map(String::from), pid: None }
+        Socket {
+            proto,
+            addr,
+            port,
+            process: process.map(String::from),
+            pid: None,
+        }
     }
 
     #[test]
@@ -140,13 +150,22 @@ mod tests {
         // run: systemd-resolved bound 53/udp to the wildcard address, and
         // the only matching ufw rule (Docker's own DNS rule) is scoped to
         // a specific destination + source, not "open to anywhere."
-        let sockets = vec![socket("udp", BindAddr::Wildcard, 53, Some("systemd-resolve"))];
+        let sockets = vec![socket(
+            "udp",
+            BindAddr::Wildcard,
+            53,
+            Some("systemd-resolve"),
+        )];
         let ufw = crate::ufw::parse(
             "Status: active\n172.17.0.1 53/udp ALLOW IN 172.16.0.0/12 # allow-docker-dns\n172.17.0.1 53/udp ALLOW IN 192.168.0.0/16 # allow-docker-dns\n",
         );
         let findings = correlate(sockets, &ufw, &[]);
         assert_eq!(findings[0].severity, Severity::ExposedRestricted);
-        assert!(findings[0].scope_note.as_ref().unwrap().contains("172.17.0.1"));
+        assert!(findings[0]
+            .scope_note
+            .as_ref()
+            .unwrap()
+            .contains("172.17.0.1"));
     }
 
     #[test]
@@ -155,8 +174,12 @@ mod tests {
         // ufw fully inactive, and it wouldn't have mattered anyway.
         let sockets = vec![socket("tcp", BindAddr::Wildcard, 8200, None)];
         let ufw = UfwState::default(); // inactive
-        let docker_ports =
-            vec![DockerPort { container: "vault".to_string(), host_bind: "0.0.0.0".to_string(), host_port: 8200, proto: "tcp".to_string() }];
+        let docker_ports = vec![DockerPort {
+            container: "vault".to_string(),
+            host_bind: "0.0.0.0".to_string(),
+            host_port: 8200,
+            proto: "tcp".to_string(),
+        }];
         let findings = correlate(sockets, &ufw, &docker_ports);
         assert_eq!(findings[0].severity, Severity::ExposedDocker);
         assert_eq!(findings[0].docker_container.as_deref(), Some("vault"));

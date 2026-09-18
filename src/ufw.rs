@@ -20,7 +20,9 @@ fn rule_re() -> &'static Regex {
     static RE: OnceLock<Regex> = OnceLock::new();
     // Captures an optional leading destination address, then port/proto,
     // e.g. "172.17.0.1 53/udp" or just "22/tcp".
-    RE.get_or_init(|| Regex::new(r"^(?:([0-9a-fA-F:.]+)\s+)?(\d+)/(tcp|udp)").expect("hardcoded regex"))
+    RE.get_or_init(|| {
+        Regex::new(r"^(?:([0-9a-fA-F:.]+)\s+)?(\d+)/(tcp|udp)").expect("hardcoded regex")
+    })
 }
 
 #[derive(Debug, Clone)]
@@ -58,7 +60,10 @@ pub struct UfwState {
 impl UfwState {
     fn matching(&self, port: u16, proto: &str) -> Vec<&Rule> {
         let proto: &str = if proto == "udp" { "udp" } else { "tcp" };
-        self.rules.iter().filter(|r| r.port == port && r.proto == proto).collect()
+        self.rules
+            .iter()
+            .filter(|r| r.port == port && r.proto == proto)
+            .collect()
     }
 
     /// True only if some rule for this port/proto is unrestricted on both
@@ -71,7 +76,10 @@ impl UfwState {
     /// destination address and/or a restricted source) rather than fully
     /// open — worth surfacing as "reachable, but only from here."
     pub fn restricted(&self, port: u16, proto: &str) -> Vec<&Rule> {
-        self.matching(port, proto).into_iter().filter(|r| !r.is_fully_open()).collect()
+        self.matching(port, proto)
+            .into_iter()
+            .filter(|r| !r.is_fully_open())
+            .collect()
     }
 }
 
@@ -87,8 +95,12 @@ pub fn parse(text: &str) -> UfwState {
             continue; // only inbound allow rules matter for "can something reach in"
         }
 
-        let Some(caps) = rule_re().captures(trimmed) else { continue };
-        let Ok(port) = caps[2].parse::<u16>() else { continue };
+        let Some(caps) = rule_re().captures(trimmed) else {
+            continue;
+        };
+        let Ok(port) = caps[2].parse::<u16>() else {
+            continue;
+        };
         let proto: &'static str = if &caps[3] == "udp" { "udp" } else { "tcp" };
         let dest = caps.get(1).map(|m| m.as_str().to_string());
 
@@ -102,7 +114,12 @@ pub fn parse(text: &str) -> UfwState {
             .map(|s| s.split('#').next().unwrap_or(s).trim().to_string())
             .unwrap_or_default();
 
-        state.rules.push(Rule { port, proto, dest, source });
+        state.rules.push(Rule {
+            port,
+            proto,
+            dest,
+            source,
+        });
     }
     state
 }
@@ -156,10 +173,19 @@ To                         Action      From
         // scoped to a specific destination + specific sources — it must
         // NOT be reported as "port 53/udp is open to anywhere."
         let state = parse(REAL_SAMPLE);
-        assert!(!state.allows(53, "udp"), "docker-dns rule is scoped, must not count as fully open");
+        assert!(
+            !state.allows(53, "udp"),
+            "docker-dns rule is scoped, must not count as fully open"
+        );
         let restricted = state.restricted(53, "udp");
-        assert_eq!(restricted.len(), 2, "both the /12 and /16 docker-dns rules should show up as restricted matches");
-        assert!(restricted.iter().all(|r| r.dest.as_deref() == Some("172.17.0.1")));
+        assert_eq!(
+            restricted.len(),
+            2,
+            "both the /12 and /16 docker-dns rules should show up as restricted matches"
+        );
+        assert!(restricted
+            .iter()
+            .all(|r| r.dest.as_deref() == Some("172.17.0.1")));
     }
 
     #[test]

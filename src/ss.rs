@@ -68,15 +68,25 @@ fn parse_lines(text: &str, proto: &'static str) -> Vec<Socket> {
         let fields: Vec<&str> = line.split_whitespace().collect();
         // State Recv-Q Send-Q Local:Port Peer:Port [Process...]
         let Some(local) = fields.get(3) else { continue };
-        let Some((addr, port_str)) = split_addr_port(local) else { continue };
-        let Ok(port) = port_str.parse::<u16>() else { continue };
+        let Some((addr, port_str)) = split_addr_port(local) else {
+            continue;
+        };
+        let Ok(port) = port_str.parse::<u16>() else {
+            continue;
+        };
 
         let (process, pid) = process_re()
             .captures(line)
             .map(|c| (Some(c[1].to_string()), c[2].parse().ok()))
             .unwrap_or((None, None));
 
-        out.push(Socket { proto, addr: classify(addr), port, process, pid });
+        out.push(Socket {
+            proto,
+            addr: classify(addr),
+            port,
+            process,
+            pid,
+        });
     }
     out
 }
@@ -90,13 +100,23 @@ fn parse_udp_lines(text: &str) -> Vec<Socket> {
         }
         let fields: Vec<&str> = line.split_whitespace().collect();
         let Some(local) = fields.get(3) else { continue };
-        let Some((addr, port_str)) = split_addr_port(local) else { continue };
-        let Ok(port) = port_str.parse::<u16>() else { continue };
+        let Some((addr, port_str)) = split_addr_port(local) else {
+            continue;
+        };
+        let Ok(port) = port_str.parse::<u16>() else {
+            continue;
+        };
         let (process, pid) = process_re()
             .captures(line)
             .map(|c| (Some(c[1].to_string()), c[2].parse().ok()))
             .unwrap_or((None, None));
-        out.push(Socket { proto: "udp", addr: classify(addr), port, process, pid });
+        out.push(Socket {
+            proto: "udp",
+            addr: classify(addr),
+            port,
+            process,
+            pid,
+        });
     }
     out
 }
@@ -128,7 +148,10 @@ LISTEN     0      128             [::]:22            [::]:*
     #[test]
     fn parses_loopback_bound_socket() {
         let sockets = parse_lines(REAL_TCP_SAMPLE, "tcp");
-        let s = sockets.iter().find(|s| s.port == 45636).expect("port 45636 present");
+        let s = sockets
+            .iter()
+            .find(|s| s.port == 45636)
+            .expect("port 45636 present");
         assert_eq!(s.addr, BindAddr::Loopback);
         assert_eq!(s.process.as_deref(), Some("wraithflow"));
         assert_eq!(s.pid, Some(405129));
@@ -137,14 +160,19 @@ LISTEN     0      128             [::]:22            [::]:*
     #[test]
     fn parses_explicit_v4_wildcard() {
         let sockets = parse_lines(REAL_TCP_SAMPLE, "tcp");
-        let s = sockets.iter().find(|s| s.port == 22 && s.addr == BindAddr::Wildcard);
+        let s = sockets
+            .iter()
+            .find(|s| s.port == 22 && s.addr == BindAddr::Wildcard);
         assert!(s.is_some(), "0.0.0.0:22 should classify as Wildcard");
     }
 
     #[test]
     fn parses_star_shorthand_wildcard() {
         let sockets = parse_lines(REAL_TCP_SAMPLE, "tcp");
-        let s = sockets.iter().find(|s| s.port == 80).expect("port 80 present");
+        let s = sockets
+            .iter()
+            .find(|s| s.port == 80)
+            .expect("port 80 present");
         assert_eq!(s.addr, BindAddr::Wildcard);
         assert_eq!(s.process.as_deref(), Some("caddy"));
     }
@@ -152,14 +180,24 @@ LISTEN     0      128             [::]:22            [::]:*
     #[test]
     fn classifies_127_range_not_just_exact_localhost() {
         let sockets = parse_lines(REAL_TCP_SAMPLE, "tcp");
-        let s = sockets.iter().find(|s| s.port == 53).expect("port 53 present");
-        assert_eq!(s.addr, BindAddr::Loopback, "127.0.0.54 is loopback range, not just 127.0.0.1");
+        let s = sockets
+            .iter()
+            .find(|s| s.port == 53)
+            .expect("port 53 present");
+        assert_eq!(
+            s.addr,
+            BindAddr::Loopback,
+            "127.0.0.54 is loopback range, not just 127.0.0.1"
+        );
     }
 
     #[test]
     fn parses_bracketed_ipv6_wildcard_with_process() {
         let sockets = parse_lines(REAL_TCP_SAMPLE, "tcp");
-        let s = sockets.iter().find(|s| s.port == 8404).expect("port 8404 present");
+        let s = sockets
+            .iter()
+            .find(|s| s.port == 8404)
+            .expect("port 8404 present");
         assert_eq!(s.addr, BindAddr::Wildcard);
         assert_eq!(s.process.as_deref(), Some("docker-proxy"));
     }

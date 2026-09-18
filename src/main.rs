@@ -8,7 +8,11 @@ use clap::Parser;
 use std::process::ExitCode;
 
 #[derive(Parser, Debug)]
-#[command(name = "sentrygrid", version = "0.1.0", about = "Network exposure auditor — is this port actually reachable?")]
+#[command(
+    name = "sentrygrid",
+    version = "0.1.0",
+    about = "Network exposure auditor — is this port actually reachable?"
+)]
 struct Args {
     /// "report" (default, human-readable) | "json"
     #[arg(long, default_value = "report")]
@@ -57,12 +61,20 @@ fn main() -> ExitCode {
 
     match args.format.as_str() {
         "json" => println!("{}", format::render_json(&findings, args.pretty)),
-        _ => print!("{}", format::render_report(&findings, !args.no_color, args.show_safe)),
+        _ => print!(
+            "{}",
+            format::render_report(&findings, !args.no_color, args.show_safe)
+        ),
     }
 
-    let any_exposed = findings
-        .iter()
-        .any(|f| matches!(f.severity, audit::Severity::ExposedAllowed | audit::Severity::ExposedRestricted | audit::Severity::ExposedDocker));
+    let any_exposed = findings.iter().any(|f| {
+        matches!(
+            f.severity,
+            audit::Severity::ExposedAllowed
+                | audit::Severity::ExposedRestricted
+                | audit::Severity::ExposedDocker
+        )
+    });
     if args.fail_on_exposed && any_exposed {
         ExitCode::FAILURE
     } else {

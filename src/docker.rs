@@ -20,7 +20,10 @@ pub struct DockerPort {
 fn mapping_re() -> &'static Regex {
     static RE: OnceLock<Regex> = OnceLock::new();
     // e.g. "0.0.0.0:8200->8200/tcp" or "127.0.0.1:5433->5432/tcp" or "[::]:8404->8404/tcp"
-    RE.get_or_init(|| Regex::new(r"(?:(\[[0-9a-fA-F:]+\]|[0-9.]+)):(\d+)->\d+/(tcp|udp)").expect("hardcoded regex"))
+    RE.get_or_init(|| {
+        Regex::new(r"(?:(\[[0-9a-fA-F:]+\]|[0-9.]+)):(\d+)->\d+/(tcp|udp)")
+            .expect("hardcoded regex")
+    })
 }
 
 pub fn parse_ports_field(container: &str, ports_field: &str) -> Vec<DockerPort> {
@@ -46,7 +49,10 @@ pub fn parse_ports_field(container: &str, ports_field: &str) -> Vec<DockerPort> 
 /// user isn't in the `docker` group) — Docker context is an enrichment,
 /// not a hard requirement for the rest of the audit to run.
 pub fn list_published_ports() -> Vec<DockerPort> {
-    let Ok(output) = Command::new("docker").args(["ps", "--format", "{{.Names}}\t{{.Ports}}"]).output() else {
+    let Ok(output) = Command::new("docker")
+        .args(["ps", "--format", "{{.Names}}\t{{.Ports}}"])
+        .output()
+    else {
         return Vec::new();
     };
     if !output.status.success() {
@@ -56,7 +62,9 @@ pub fn list_published_ports() -> Vec<DockerPort> {
     let mut out = Vec::new();
     for line in text.lines() {
         let mut parts = line.splitn(2, '\t');
-        let (Some(name), Some(ports)) = (parts.next(), parts.next()) else { continue };
+        let (Some(name), Some(ports)) = (parts.next(), parts.next()) else {
+            continue;
+        };
         out.extend(parse_ports_field(name, ports));
     }
     out
@@ -86,7 +94,10 @@ mod tests {
     #[test]
     fn ignores_unpublished_internal_ports() {
         // real deploy-caddy-1 line: internal-only entries mixed with one real publish
-        let ports = parse_ports_field("deploy-caddy-1", "443/tcp, 2019/tcp, 443/udp, 127.0.0.1:8880->80/tcp");
+        let ports = parse_ports_field(
+            "deploy-caddy-1",
+            "443/tcp, 2019/tcp, 443/udp, 127.0.0.1:8880->80/tcp",
+        );
         assert_eq!(ports.len(), 1);
         assert_eq!(ports[0].host_bind, "127.0.0.1");
         assert_eq!(ports[0].host_port, 8880);

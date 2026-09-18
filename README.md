@@ -1,10 +1,24 @@
 # 🛰️ SentryGrid
 
+[![CI](https://github.com/darkstardevx/sentrygrid/actions/workflows/ci.yml/badge.svg)](https://github.com/darkstardevx/sentrygrid/actions/workflows/ci.yml)
+[![Release](https://github.com/darkstardevx/sentrygrid/actions/workflows/release.yml/badge.svg)](https://github.com/darkstardevx/sentrygrid/actions/workflows/release.yml)
+
 `Rust` · `ufw` · `nftables`-adjacent · `docker`
 
 **Network exposure auditor.** Answers the one question `ss`, `ufw status`,
 and `docker ps` each only partially answer on their own: **is this port
 actually reachable, and by what mechanism?**
+
+## 📦 Install
+
+```bash
+curl -fsSL https://raw.githubusercontent.com/darkstardevx/sentrygrid/main/install.sh | sh
+```
+
+Downloads the latest release for Linux (x86_64 or aarch64), verifies its
+SHA-256 checksum, and installs `sentrygrid` to `~/.local/bin`. Linux only
+— SentryGrid shells out to `ss` and `ufw`, both Linux-specific, so there's
+no macOS build. Or build from source with `cargo build --release`.
 
 Built directly out of a real incident this session: a Docker container
 (`vault`, running with a hardcoded dev root token) was reachable on the
