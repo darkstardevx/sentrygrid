@@ -1,9 +1,13 @@
+<p align="center"><img src="assets/brand/sentrygrid-hero.svg" alt="SentryGrid" width="100%"></p>
+
 # 🛰️ SentryGrid
 
 [![CI](https://github.com/darkstardevx/sentrygrid/actions/workflows/ci.yml/badge.svg)](https://github.com/darkstardevx/sentrygrid/actions/workflows/ci.yml)
 [![Release](https://github.com/darkstardevx/sentrygrid/actions/workflows/release.yml/badge.svg)](https://github.com/darkstardevx/sentrygrid/actions/workflows/release.yml)
 
 `Rust` · `ufw` · `nftables`-adjacent · `docker`
+
+**[darkstardevx.github.io/sentrygrid](https://darkstardevx.github.io/sentrygrid/)**
 
 **Network exposure auditor.** Answers the one question `ss`, `ufw status`,
 and `docker ps` each only partially answer on their own: **is this port
