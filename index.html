@@ -1,0 +1,325 @@
+<!doctype html>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>SentryGrid — network exposure auditor</title>
+<meta name="description" content="Correlates ss, ufw, and docker to answer one question: is this port actually reachable, and by what mechanism?">
+<link rel="icon" type="image/svg+xml" href="data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHZpZXdCb3g9IjAgMCAxMjggMTI4Ij4KICAKICA8ZGVmcz48L2RlZnM+CiAgPHJlY3Qgd2lkdGg9IjEyOCIgaGVpZ2h0PSIxMjgiIHJ4PSIyOCIgZmlsbD0iIzA4MDkwYiIvPgogIDxjaXJjbGUgY3g9IjI5LjYiIGN5PSIyOS42IiByPSIxMi4yIiBmaWxsPSJub25lIiBzdHJva2U9IiM0ZGE2ZmYiIHN0cm9rZS13aWR0aD0iMi4xIi8+PGNpcmNsZSBjeD0iNjQuMCIgY3k9IjI5LjYiIHI9IjEyLjIiIGZpbGw9Im5vbmUiIHN0cm9rZT0iIzRkYTZmZiIgc3Ryb2tlLXdpZHRoPSIyLjEiLz48Y2lyY2xlIGN4PSI5OC40IiBjeT0iMjkuNiIgcj0iMTIuMiIgZmlsbD0iI2ZmNGQ0ZCIvPjxjaXJjbGUgY3g9IjI5LjYiIGN5PSI2NC4wIiByPSIxMi4yIiBmaWxsPSJub25lIiBzdHJva2U9IiM0ZGE2ZmYiIHN0cm9rZS13aWR0aD0iMi4xIi8+PGNpcmNsZSBjeD0iNjQuMCIgY3k9IjY0LjAiIHI9IjEyLjIiIGZpbGw9Im5vbmUiIHN0cm9rZT0iIzRkYTZmZiIgc3Ryb2tlLXdpZHRoPSIyLjEiLz48Y2lyY2xlIGN4PSI5OC40IiBjeT0iNjQuMCIgcj0iMTIuMiIgZmlsbD0ibm9uZSIgc3Ryb2tlPSIjNGRhNmZmIiBzdHJva2Utd2lkdGg9IjIuMSIvPjxjaXJjbGUgY3g9IjI5LjYiIGN5PSI5OC40IiByPSIxMi4yIiBmaWxsPSJub25lIiBzdHJva2U9IiM0ZGE2ZmYiIHN0cm9rZS13aWR0aD0iMi4xIi8+PGNpcmNsZSBjeD0iNjQuMCIgY3k9Ijk4LjQiIHI9IjEyLjIiIGZpbGw9Im5vbmUiIHN0cm9rZT0iIzRkYTZmZiIgc3Ryb2tlLXdpZHRoPSIyLjEiLz48Y2lyY2xlIGN4PSI5OC40IiBjeT0iOTguNCIgcj0iMTIuMiIgZmlsbD0ibm9uZSIgc3Ryb2tlPSIjNGRhNmZmIiBzdHJva2Utd2lkdGg9IjIuMSIvPgo8L3N2Zz4=">
+<style>
+  @import url('https://fonts.googleapis.com/css2?family=Manrope:wght@500;600;700;800&family=Fira+Code:wght@400;500;600&display=swap');
+
+  :root {
+    --void: #08090b;
+    --panel: 17, 20, 24;
+    --line: #232a32;
+    --line2: #171b20;
+    --alert: #ff4d4d;
+    --signal: #4da6ff;
+    --blocked: #ffb020;
+    --white: #eef3f7;
+    --muted: #7f8ea0;
+    --dim: #374250;
+    color-scheme: dark;
+  }
+  * { box-sizing: border-box; }
+  ::selection { background: rgba(77,166,255,.25); color: #fff; }
+
+  body {
+    margin: 0;
+    background: var(--void);
+    color: #c5d0db;
+    font-family: 'Manrope', -apple-system, sans-serif;
+    font-size: 15.5px;
+    line-height: 1.6;
+    -webkit-font-smoothing: antialiased;
+  }
+  img { max-width: 100%; }
+  a { color: inherit; }
+  .wrap { max-width: 1040px; margin: 0 auto; padding-inline: 24px; }
+  h1, h2, h3 { font-family: 'Manrope', sans-serif; color: var(--white); margin: 0; font-weight: 800; text-wrap: balance; }
+  p { margin: 0; }
+  code { font-family: 'Fira Code', monospace; background: rgba(255,255,255,.05); padding: 1px 5px; border-radius: 3px; font-size: .87em; }
+  .mono { font-family: 'Fira Code', monospace; }
+
+  /* ---------- compact topbar (deliberately not a full nav) ---------- */
+  .topbar {
+    position: sticky; top: 0; z-index: 40;
+    backdrop-filter: blur(12px);
+    background: rgba(8,9,11,.85);
+    border-bottom: 1px solid var(--line);
+  }
+  .topbar .wrap { display: flex; align-items: center; justify-content: space-between; height: 54px; }
+  .brand { display: flex; align-items: center; gap: 9px; text-decoration: none; }
+  .brand img { width: 22px; height: 22px; }
+  .brand span { font-weight: 800; color: var(--white); font-size: 14.5px; letter-spacing: -.01em; }
+  .topbar-actions { display: flex; align-items: center; gap: 10px; }
+  .topbar-actions a.gh { font-family: 'Fira Code', monospace; font-size: 12px; color: var(--muted); text-decoration: none; }
+  .topbar-actions a.gh:hover { color: var(--white); }
+  .btn-install {
+    font-family: 'Fira Code', monospace; font-size: 12px; font-weight: 500;
+    padding: 7px 14px; border-radius: 6px; text-decoration: none;
+    background: rgba(77,166,255,.12); border: 1px solid var(--signal); color: #fff;
+  }
+  .btn-install:hover { background: rgba(77,166,255,.22); }
+
+  /* ---------- dashboard header block ---------- */
+  .dash-head { padding: 44px 0 28px; }
+  .dash-eyebrow { font-family: 'Fira Code', monospace; font-size: 11.5px; letter-spacing: .12em; text-transform: uppercase; color: var(--signal); margin-bottom: 10px; }
+  .dash-head h1 { font-size: 38px; line-height: 1.15; margin-bottom: 12px; max-width: 18ch; }
+  .dash-head p { color: var(--muted); font-size: 15px; max-width: 62ch; font-family: 'Fira Code', monospace; line-height: 1.7; }
+
+  /* ---------- stat tiles ---------- */
+  .stats { display: grid; grid-template-columns: repeat(3, 1fr); gap: 14px; padding: 10px 0 8px; }
+  .stat-tile {
+    border-radius: 12px; border: 1px solid var(--line);
+    background: rgba(255,255,255,.02);
+    padding: 18px 20px;
+  }
+  .stat-tile.safe { border-color: rgba(77,166,255,.35); }
+  .stat-tile.blocked { border-color: rgba(255,176,32,.3); }
+  .stat-tile.exposed { border-color: rgba(255,77,77,.4); background: rgba(255,77,77,.04); }
+  .stat-label { font-family: 'Fira Code', monospace; font-size: 11px; letter-spacing: .08em; text-transform: uppercase; color: var(--muted); margin-bottom: 8px; }
+  .stat-num { font-family: 'Manrope', sans-serif; font-weight: 800; font-size: 34px; line-height: 1; color: var(--white); font-variant-numeric: tabular-nums; }
+  .stat-tile.safe .stat-num { color: var(--signal); }
+  .stat-tile.blocked .stat-num { color: var(--blocked); }
+  .stat-tile.exposed .stat-num { color: var(--alert); }
+  .stat-sub { font-size: 12px; color: var(--dim); margin-top: 4px; font-family: 'Fira Code', monospace; }
+
+  /* ---------- findings feed ---------- */
+  .feed-section { padding: 40px 0 8px; }
+  .feed-head { display: flex; align-items: baseline; justify-content: space-between; margin-bottom: 14px; }
+  .feed-head h2 { font-size: 17px; }
+  .feed-head span { font-family: 'Fira Code', monospace; font-size: 11.5px; color: var(--dim); }
+  .feed {
+    border: 1px solid var(--line); border-radius: 12px; overflow: hidden;
+    background: rgba(255,255,255,.015);
+  }
+  .feed-row {
+    display: grid; grid-template-columns: 96px 1fr auto; gap: 14px; align-items: center;
+    padding: 13px 18px; border-bottom: 1px solid var(--line2);
+    font-family: 'Fira Code', monospace; font-size: 13px;
+  }
+  .feed-row:last-child { border-bottom: none; }
+  .sev-pill {
+    display: inline-flex; align-items: center; justify-content: center;
+    padding: 3px 8px; border-radius: 5px; font-size: 10.5px; font-weight: 600; letter-spacing: .04em;
+  }
+  .sev-pill.safe { background: rgba(77,166,255,.14); color: var(--signal); }
+  .sev-pill.blocked { background: rgba(255,176,32,.14); color: var(--blocked); }
+  .sev-pill.exposed { background: rgba(255,77,77,.16); color: var(--alert); }
+  .feed-target { color: var(--white); }
+  .feed-target .proc { color: var(--muted); }
+  .feed-reason { color: var(--dim); text-align: right; white-space: nowrap; }
+
+  /* ---------- classification legend strip ---------- */
+  .legend-section { padding: 42px 0 8px; }
+  .legend-section h2 { font-size: 17px; margin-bottom: 14px; }
+  .legend-strip { display: grid; grid-template-columns: repeat(auto-fit, minmax(180px, 1fr)); gap: 12px; }
+  .legend-card { border: 1px solid var(--line); border-radius: 10px; padding: 14px 16px; background: rgba(255,255,255,.015); }
+  .legend-tag { font-family: 'Fira Code', monospace; font-size: 11px; font-weight: 600; letter-spacing: .04em; margin-bottom: 8px; display: inline-block; }
+  .legend-tag.safe { color: var(--signal); }
+  .legend-tag.blocked { color: var(--blocked); }
+  .legend-tag.exposed { color: var(--alert); }
+  .legend-card p { font-size: 12.5px; color: var(--muted); line-height: 1.55; }
+
+  .seam { display: flex; align-items: center; gap: 8px; padding: 40px 0 0; }
+  .seam .line { flex: 1; height: 1px; background: repeating-linear-gradient(90deg, var(--line) 0 6px, transparent 6px 16px); }
+  .seam .dot { width: 4px; height: 4px; border-radius: 50%; background: var(--line); }
+
+  /* ---------- install ---------- */
+  .install-section { padding: 44px 0 54px; }
+  .install-panel {
+    border: 1px solid var(--line); border-radius: 12px;
+    background: linear-gradient(160deg, rgba(17,20,24,.9), rgba(8,9,11,.95));
+    padding: 24px 26px;
+  }
+  .install-panel-head { display: flex; align-items: center; justify-content: space-between; margin-bottom: 16px; flex-wrap: wrap; gap: 10px; }
+  .install-panel-head h2 { font-size: 18px; }
+  .install-panel-head p { font-size: 12.5px; color: var(--muted); font-family: 'Fira Code', monospace; }
+  .cmd-row { display: flex; align-items: center; gap: 10px; padding: 12px 8px 12px 16px; background: rgba(0,0,0,.3); border: 1px solid var(--line2); border-radius: 8px; }
+  .cmd-row .prompt { color: var(--signal); font-family: 'Fira Code', monospace; font-size: 13px; flex-shrink: 0; }
+  .cmd-row code { flex: 1; font-size: 12.6px; background: none; padding: 0; overflow-x: auto; white-space: nowrap; }
+  .copy-btn { flex-shrink: 0; width: 32px; height: 32px; border-radius: 7px; border: 1px solid var(--line2); background: rgba(255,255,255,.03); color: var(--muted); display: flex; align-items: center; justify-content: center; cursor: pointer; }
+  .copy-btn:hover { border-color: var(--line); color: #fff; }
+  .copy-btn.copied { color: var(--signal); border-color: var(--signal); }
+  .install-note { font-size: 11.5px; color: var(--dim); margin-top: 12px; font-family: 'Fira Code', monospace; }
+  .dl-count { font-family: 'Fira Code', monospace; font-size: 12px; color: var(--muted); }
+  .install-more a { font-size: 12.5px; color: var(--muted); text-decoration: none; border-bottom: 1px dotted var(--line); font-family: 'Fira Code', monospace; }
+  .install-more a:hover { color: var(--signal); border-color: var(--signal); }
+
+  footer { border-top: 1px solid var(--line); padding: 24px 0 36px; }
+  .foot-row { display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 12px; }
+  .foot-brand { display: flex; align-items: center; gap: 9px; font-size: 12px; color: var(--muted); font-family: 'Fira Code', monospace; }
+  .foot-brand img { width: 16px; height: 16px; }
+  .foot-links a { font-size: 12px; color: var(--muted); text-decoration: none; font-weight: 500; font-family: 'Fira Code', monospace; margin-left: 16px; }
+  .foot-links a:hover { color: #fff; }
+  .foot-family { font-family: 'Fira Code', monospace; font-size: 10px; letter-spacing: .06em; color: #1f2730; text-transform: uppercase; }
+
+  @media (max-width: 760px) {
+    .stats { grid-template-columns: 1fr; }
+    .feed-row { grid-template-columns: 72px 1fr; }
+    .feed-reason { display: none; }
+    .dash-head h1 { font-size: 30px; max-width: none; }
+    .install-panel-head { flex-direction: column; align-items: flex-start; }
+  }
+</style>
+
+<div class="topbar">
+  <div class="wrap">
+    <a class="brand" href="#">
+      <img src="data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHZpZXdCb3g9IjAgMCAxMjggMTI4Ij4KICAKICA8ZGVmcz48L2RlZnM+CiAgPHJlY3Qgd2lkdGg9IjEyOCIgaGVpZ2h0PSIxMjgiIHJ4PSIyOCIgZmlsbD0iIzA4MDkwYiIvPgogIDxjaXJjbGUgY3g9IjI5LjYiIGN5PSIyOS42IiByPSIxMi4yIiBmaWxsPSJub25lIiBzdHJva2U9IiM0ZGE2ZmYiIHN0cm9rZS13aWR0aD0iMi4xIi8+PGNpcmNsZSBjeD0iNjQuMCIgY3k9IjI5LjYiIHI9IjEyLjIiIGZpbGw9Im5vbmUiIHN0cm9rZT0iIzRkYTZmZiIgc3Ryb2tlLXdpZHRoPSIyLjEiLz48Y2lyY2xlIGN4PSI5OC40IiBjeT0iMjkuNiIgcj0iMTIuMiIgZmlsbD0iI2ZmNGQ0ZCIvPjxjaXJjbGUgY3g9IjI5LjYiIGN5PSI2NC4wIiByPSIxMi4yIiBmaWxsPSJub25lIiBzdHJva2U9IiM0ZGE2ZmYiIHN0cm9rZS13aWR0aD0iMi4xIi8+PGNpcmNsZSBjeD0iNjQuMCIgY3k9IjY0LjAiIHI9IjEyLjIiIGZpbGw9Im5vbmUiIHN0cm9rZT0iIzRkYTZmZiIgc3Ryb2tlLXdpZHRoPSIyLjEiLz48Y2lyY2xlIGN4PSI5OC40IiBjeT0iNjQuMCIgcj0iMTIuMiIgZmlsbD0ibm9uZSIgc3Ryb2tlPSIjNGRhNmZmIiBzdHJva2Utd2lkdGg9IjIuMSIvPjxjaXJjbGUgY3g9IjI5LjYiIGN5PSI5OC40IiByPSIxMi4yIiBmaWxsPSJub25lIiBzdHJva2U9IiM0ZGE2ZmYiIHN0cm9rZS13aWR0aD0iMi4xIi8+PGNpcmNsZSBjeD0iNjQuMCIgY3k9Ijk4LjQiIHI9IjEyLjIiIGZpbGw9Im5vbmUiIHN0cm9rZT0iIzRkYTZmZiIgc3Ryb2tlLXdpZHRoPSIyLjEiLz48Y2lyY2xlIGN4PSI5OC40IiBjeT0iOTguNCIgcj0iMTIuMiIgZmlsbD0ibm9uZSIgc3Ryb2tlPSIjNGRhNmZmIiBzdHJva2Utd2lkdGg9IjIuMSIvPgo8L3N2Zz4=" alt="">
+      <span>SENTRYGRID</span>
+    </a>
+    <div class="topbar-actions">
+      <a class="gh" href="https://github.com/darkstardevx/sentrygrid" target="_blank" rel="noopener">GitHub</a>
+      <a class="btn-install" href="#install">Install</a>
+    </div>
+  </div>
+</div>
+
+<div class="wrap">
+  <div class="dash-head">
+    <div class="dash-eyebrow">Network Exposure Auditor</div>
+    <h1>Is this port actually reachable?</h1>
+    <p><code>ss</code>, <code>ufw status</code>, and <code>docker ps</code> each only partially answer that. SentryGrid correlates all three — because Docker inserts its own iptables rules ahead of ufw's, a port can be wide open on the LAN while ufw reports nothing wrong at all.</p>
+  </div>
+
+  <div class="stats">
+    <div class="stat-tile safe">
+      <div class="stat-label">Safe</div>
+      <div class="stat-num">6</div>
+      <div class="stat-sub">loopback only</div>
+    </div>
+    <div class="stat-tile blocked">
+      <div class="stat-label">Blocked</div>
+      <div class="stat-num">2</div>
+      <div class="stat-sub">bound wide, no ufw rule</div>
+    </div>
+    <div class="stat-tile exposed">
+      <div class="stat-label">Exposed</div>
+      <div class="stat-num">1</div>
+      <div class="stat-sub">reachable right now</div>
+    </div>
+  </div>
+
+  <div class="feed-section">
+    <div class="feed-head">
+      <h2>Live findings</h2>
+      <span>sudo sentrygrid</span>
+    </div>
+    <div class="feed">
+      <div class="feed-row">
+        <span class="sev-pill safe">SAFE</span>
+        <span class="feed-target">127.0.0.1:5432 <span class="proc">postgres</span></span>
+        <span class="feed-reason">loopback-bound</span>
+      </div>
+      <div class="feed-row">
+        <span class="sev-pill safe">SAFE</span>
+        <span class="feed-target">127.0.0.1:6379 <span class="proc">redis-server</span></span>
+        <span class="feed-reason">loopback-bound</span>
+      </div>
+      <div class="feed-row">
+        <span class="sev-pill blocked">BLOCKED</span>
+        <span class="feed-target">0.0.0.0:8080 <span class="proc">python3</span></span>
+        <span class="feed-reason">no matching ufw rule</span>
+      </div>
+      <div class="feed-row">
+        <span class="sev-pill exposed">EXPOSED</span>
+        <span class="feed-target">0.0.0.0:8200 <span class="proc">docker-proxy</span></span>
+        <span class="feed-reason">docker bypasses ufw</span>
+      </div>
+      <div class="feed-row">
+        <span class="sev-pill safe">SAFE</span>
+        <span class="feed-target">[::1]:9200 <span class="proc">darkbox_systools</span></span>
+        <span class="feed-reason">loopback-bound</span>
+      </div>
+      <div class="feed-row">
+        <span class="sev-pill blocked">BLOCKED</span>
+        <span class="feed-target">0.0.0.0:53/udp <span class="proc">systemd-resolved</span></span>
+        <span class="feed-reason">scoped to 172.16.0.0/12</span>
+      </div>
+    </div>
+  </div>
+
+  <div class="legend-section">
+    <h2>How it classifies</h2>
+    <div class="legend-strip">
+      <div class="legend-card">
+        <span class="legend-tag safe">SAFE</span>
+        <p>Bound to loopback only — not reachable from anywhere else on the network.</p>
+      </div>
+      <div class="legend-card">
+        <span class="legend-tag blocked">BLOCKED</span>
+        <p>Bound wide, but ufw's default-deny has no matching rule — currently unreachable.</p>
+      </div>
+      <div class="legend-card">
+        <span class="legend-tag exposed">EXPOSED (ufw-allowed)</span>
+        <p>Bound wide, ufw has an unrestricted ALLOW IN rule — reachable from anywhere.</p>
+      </div>
+      <div class="legend-card">
+        <span class="legend-tag exposed">EXPOSED (ufw-scoped)</span>
+        <p>Bound wide, ufw's rule is scoped to a specific address — reachable, but only from that scope.</p>
+      </div>
+      <div class="legend-card">
+        <span class="legend-tag exposed">EXPOSED (docker)</span>
+        <p>Bound wide and Docker-managed — reachable regardless of what ufw says.</p>
+      </div>
+    </div>
+  </div>
+
+  <div class="seam"><span class="dot"></span><div class="line"></div><span class="dot"></span></div>
+
+  <div class="install-section" id="install">
+    <div class="install-panel">
+      <div class="install-panel-head">
+        <div>
+          <h2>Add SentryGrid to your host</h2>
+          <p>Downloads, verifies the checksum, installs to ~/.local/bin.</p>
+        </div>
+        <span class="dl-count" id="dl-count">&hellip;</span>
+      </div>
+      <div class="cmd-row">
+        <span class="prompt">&gt;_</span>
+        <code id="sg-cmd" class="mono">curl -fsSL https://raw.githubusercontent.com/darkstardevx/sentrygrid/main/install.sh | sh</code>
+        <button class="copy-btn" onclick="sgCopy(this)" aria-label="Copy command">
+          <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="9" y="9" width="12" height="12" rx="2"/><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/></svg>
+        </button>
+      </div>
+      <p class="install-note">Linux only (x86_64, aarch64) — SentryGrid shells out to ss and ufw, both Linux-specific.</p>
+      <p class="install-more" style="margin-top:10px;"><a href="https://github.com/darkstardevx/sentrygrid#-running" target="_blank" rel="noopener">Usage &amp; flags →</a></p>
+    </div>
+  </div>
+</div>
+
+<footer>
+  <div class="wrap foot-row">
+    <div class="foot-brand">
+      <img src="data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHZpZXdCb3g9IjAgMCAxMjggMTI4Ij4KICAKICA8ZGVmcz48L2RlZnM+CiAgPHJlY3Qgd2lkdGg9IjEyOCIgaGVpZ2h0PSIxMjgiIHJ4PSIyOCIgZmlsbD0iIzA4MDkwYiIvPgogIDxjaXJjbGUgY3g9IjI5LjYiIGN5PSIyOS42IiByPSIxMi4yIiBmaWxsPSJub25lIiBzdHJva2U9IiM0ZGE2ZmYiIHN0cm9rZS13aWR0aD0iMi4xIi8+PGNpcmNsZSBjeD0iNjQuMCIgY3k9IjI5LjYiIHI9IjEyLjIiIGZpbGw9Im5vbmUiIHN0cm9rZT0iIzRkYTZmZiIgc3Ryb2tlLXdpZHRoPSIyLjEiLz48Y2lyY2xlIGN4PSI5OC40IiBjeT0iMjkuNiIgcj0iMTIuMiIgZmlsbD0iI2ZmNGQ0ZCIvPjxjaXJjbGUgY3g9IjI5LjYiIGN5PSI2NC4wIiByPSIxMi4yIiBmaWxsPSJub25lIiBzdHJva2U9IiM0ZGE2ZmYiIHN0cm9rZS13aWR0aD0iMi4xIi8+PGNpcmNsZSBjeD0iNjQuMCIgY3k9IjY0LjAiIHI9IjEyLjIiIGZpbGw9Im5vbmUiIHN0cm9rZT0iIzRkYTZmZiIgc3Ryb2tlLXdpZHRoPSIyLjEiLz48Y2lyY2xlIGN4PSI5OC40IiBjeT0iNjQuMCIgcj0iMTIuMiIgZmlsbD0ibm9uZSIgc3Ryb2tlPSIjNGRhNmZmIiBzdHJva2Utd2lkdGg9IjIuMSIvPjxjaXJjbGUgY3g9IjI5LjYiIGN5PSI5OC40IiByPSIxMi4yIiBmaWxsPSJub25lIiBzdHJva2U9IiM0ZGE2ZmYiIHN0cm9rZS13aWR0aD0iMi4xIi8+PGNpcmNsZSBjeD0iNjQuMCIgY3k9Ijk4LjQiIHI9IjEyLjIiIGZpbGw9Im5vbmUiIHN0cm9rZT0iIzRkYTZmZiIgc3Ryb2tlLXdpZHRoPSIyLjEiLz48Y2lyY2xlIGN4PSI5OC40IiBjeT0iOTguNCIgcj0iMTIuMiIgZmlsbD0ibm9uZSIgc3Ryb2tlPSIjNGRhNmZmIiBzdHJva2Utd2lkdGg9IjIuMSIvPgo8L3N2Zz4=" alt="">
+      <span>SentryGrid &middot; MIT licensed</span>
+    </div>
+    <div>
+      <a href="https://github.com/darkstardevx/sentrygrid" target="_blank" rel="noopener">GitHub</a>
+      <a href="#install">Install</a>
+    </div>
+    <div class="foot-family">Cybercore family</div>
+  </div>
+</footer>
+
+<script>
+  function sgCopy(btn) {
+    const text = document.getElementById('sg-cmd').textContent;
+    navigator.clipboard?.writeText(text).then(() => {
+      btn.classList.add('copied');
+      setTimeout(() => btn.classList.remove('copied'), 1400);
+    }).catch(() => {});
+  }
+
+  fetch('https://api.github.com/repos/darkstardevx/sentrygrid/releases/latest', { headers: { Accept: 'application/vnd.github+json' } })
+    .then(r => { if (!r.ok) throw new Error(r.status); return r.json(); })
+    .then(rel => {
+      const dl = (rel.assets || [])
+        .filter(a => !a.name.endsWith('.sha256'))
+        .reduce((sum, a) => sum + (a.download_count || 0), 0);
+      document.getElementById('dl-count').textContent = dl.toLocaleString() + ' downloads (' + rel.tag_name + ')';
+    })
+    .catch(() => { document.getElementById('dl-count').textContent = ''; });
+</script>
